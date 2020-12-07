@@ -5,6 +5,11 @@
 
 #include<M5Stack.h>
 #include<Wire.h>
+#include "utility/MahonyAHRS.h"
+
+#include "./Graph.h"
+
+File f;
 
 //gps
 #include <TinyGPS++.h>
@@ -20,7 +25,7 @@
 
 //GPS
 TinyGPSPlus gps;
-HardwareSerial GPSserial(1);
+HardwareSerial GPSserial(2);
 
 //3G
 //TinyGsm modem(Serial2);
@@ -30,6 +35,9 @@ HardwareSerial GPSserial(1);
 Adafruit_NeoPixel pixels = Adafruit_NeoPixel(10,15,NEO_GRB+NEO_KHZ800);
 
 //IMU
+#define DEG_TO_RAD 0.017453292519943295769236907684886
+
+
 float accX = 0.0F;
 float accY = 0.0F;
 float accZ = 0.0F;
@@ -38,11 +46,16 @@ float gyroX = 0.0F;
 float gyroY = 0.0F;
 float gyroZ = 0.0F;
 
+float gyroX0 = 0.0F;
+float gyroY0 = 0.0F;
+float gyroZ0 = 0.0F;
+
 float pitch = 0.0F;
 float roll  = 0.0F;
 float yaw   = 0.0F;
 
 float lastpitch = 0.0F;
+float bf_g=0.0F;
 
 float temp = 0.0F;
 
@@ -58,18 +71,18 @@ Adafruit_SHT31 sht30=Adafruit_SHT31();
 float tmp=0.0F;
 float hum=0.0F;
 float pressure=0.0F;
-float last_tmp=0.0F;
-float last_hum=0.0F;
-float last_press=0.0F;
 
 TFT_eSprite tmp_s = TFT_eSprite(&M5.Lcd);
 TFT_eSprite hum_s =TFT_eSprite(&M5.Lcd);
 TFT_eSprite press_s=TFT_eSprite(&M5.Lcd);
-
+Graph tmp_graph=Graph(0,40,99,30,&tmp_s);
+Graph hum_graph=Graph(101,40,98,30,&hum_s);
+Graph press_graph = Graph(201,40,118,30,&press_s);
 
 void setup() {
   // put your setup code here, to run once:
   M5.begin();
+  M5.Power.begin();
   Wire.begin();
 
   M5.Lcd.drawFastHLine(0, 20, 320, TFT_GREEN);
@@ -93,7 +106,16 @@ void setup() {
   
   //IMU
   M5.IMU.Init();
-  M5.IMU.setGyroOffset(800, 980, -248);
+  M5.IMU.setGyroFsr(M5.IMU.GFS_250DPS);
+  M5.IMU.setAccelFsr(M5.IMU.AFS_8G);
+  M5.IMU.setGyroOffset(700, 1100, -300);
+  for(int i=0;i<100;i++){
+    M5.IMU.getGyroData(&gyroX,&gyroY,&gyroZ);
+    gyroX0+=gyroX/100;
+    gyroY0+=gyroY/100;
+    gyroZ0+=gyroZ/100;
+    delay(10);
+  }
   //bank graph
   bank.setColorDepth(4);
   bank.createSprite(61, 70);
@@ -108,15 +130,9 @@ void setup() {
   bme.begin(0x76);
   sht30.begin(0x44);
 
-  tmp_s.setColorDepth(3);
-  hum_s.setColorDepth(3);
-  press_s.setColorDepth(3);
-  tmp_s.createSprite(99,30);
-  hum_s.createSprite(98,30);
-  press_s.createSprite(118,30);
-  tmp_s.fillSprite(TFT_BLUE);
-  hum_s.fillSprite(TFT_BLUE);
-  press_s.fillSprite(TFT_BLUE);
+  tmp_graph.init();
+  hum_graph.init();
+  press_graph.init();
 
   //clock box
   M5.Lcd.drawRect(20, 215, 80, 25, TFT_GREEN);
@@ -139,7 +155,9 @@ void loop() {
   if (GPSserial.available()) {
     gps.encode(GPSserial.read());
     M5.Lcd.setCursor(60, 0);
-    M5.Lcd.print("GPS");
+    if(gps.satellites.value()){
+      M5.Lcd.printf("GPS%1d",gps.satellites.value());
+    }
   }
   static uint8_t mode = 0;
   //header 3G connection GPS
@@ -174,20 +192,36 @@ void loop() {
       bank.drawFastHLine(0,0,60,TFT_BLUE);
       grav.drawFastVLine(0,0,70,TFT_BLUE);
     }
-    bank.drawPixel(30 + pitch / 3, 0, TFT_GREEN);
-    bank.scroll(0, 1);
-
+    bank.drawPixel(30 + roll / 3, 0, TFT_GREEN);
+    
     grav.pushSprite(250,78);
-    grav.drawPixel(0,45-accZ*10,TFT_GREEN);
+    grav.drawPixel(0,45-bf_g*30,TFT_GREEN);
+    
+  }else if(count%10==1){
+    //write SD
+    static char filename[40] ;
+    if(gps.satellites.value()){
+    sprintf(filename,"/%04d-%02d-%02d-%02d:00.csv"
+            ,gps.date.year(),gps.date.month(),gps.date.day(),gps.time.hour());
+    }else{
+      sprintf(filename,"/log.csv");
+    }
+    f=SD.open(filename,FILE_APPEND);
+    if(f){
+      f.println(String(pitch)+","+String(roll)+","+String(yaw));
+    }
+    f.close();
+  }else if(count%20==2){
+    bank.scroll(0, 1);
     grav.scroll(1,0 );
+  
   }else if(count==199){
+    //ENV2
     count=0;
-    tmp_s.pushSprite(0,40);
-    hum_s.pushSprite(101,40);
-    press_s.pushSprite(201,40);
     pressure=bme.readPressure()*0.0002953;
     tmp=sht30.readTemperature();
     hum=sht30.readHumidity();
+    
     //M5.Lcd.setTextSize(1);
     M5.Lcd.setCursor(0,22);
     M5.Lcd.printf("%2.1fC",tmp);
@@ -197,28 +231,24 @@ void loop() {
     M5.Lcd.printf("%2.2finHg",pressure);
     M5.Lcd.setTextSize(2);
 
-    tmp_s.scroll(1,(tmp-last_tmp)*30);
-    hum_s.scroll(1,(hum-last_hum)*10);
-    press_s.scroll(1,(pressure-last_press)*1000);
-    tmp_s.drawPixel(0,15,TFT_GREEN);
-    hum_s.drawPixel(0,15,TFT_GREEN);
-    press_s.drawPixel(0,15,TFT_GREEN);
-
-    last_tmp=tmp;
-    last_hum=hum;
-    last_press=pressure;
+    tmp_graph.centerPlot(tmp*30);
+    hum_graph.centerPlot(hum*10);
+    press_graph.centerPlot(pressure*1000);
   }
-  //roll indicator
-  //bank angle pitch=roll
-  M5.Lcd.drawLine(150, 148, 150 + 60 * sin(pitch * 6.28 / 360), 148 - 60 * cos(pitch * 6.28 / 360), TFT_BLACK);
-  M5.IMU.getAhrsData(&pitch, &roll, &yaw);
-  M5.Lcd.drawCircleHelper(150, 148, 70, 0x3, TFT_GREEN);
-  M5.Lcd.drawLine(150, 148, 150 + 60 * sin(pitch * 6.28 / 360), 148 - 60 * cos(pitch * 6.28 / 360), TFT_GREEN);
-  //G indicator
-  M5.Lcd.drawFastHLine(231,123-accZ*10,8,TFT_BLACK);
+  M5.IMU.getGyroData(&gyroX,&gyroY,&gyroZ);
   M5.IMU.getAccelData(&accX,&accY,&accZ);
-  M5.Lcd.drawFastHLine(231,123-accZ*10,8,TFT_GREEN);
-  
+  //roll indicator
+  //bank angle 
+  M5.Lcd.drawLine(150, 148, 150 + 60 * sin(roll * 6.28 / 360), 148 - 60 * cos(roll * 6.28 / 360), TFT_BLACK);
+  //M5.IMU.getAhrsData(&pitch, &roll, &yaw);
+  MahonyAHRSupdateIMU((gyroX-gyroX0) * DEG_TO_RAD*0.6, (gyroY-gyroY0) * DEG_TO_RAD*0.6, (gyroZ-gyroZ0) * DEG_TO_RAD*0.6, accX, accY, accZ, &roll, &pitch, &yaw);
+  M5.Lcd.drawCircleHelper(150, 148, 70, 0x3, TFT_GREEN);
+  M5.Lcd.drawLine(150, 148, 150 + 60 * sin(roll * 6.28 / 360), 148 - 60 * cos(roll * 6.28 / 360), TFT_GREEN);
+
+  //G indicator
+  M5.Lcd.drawFastHLine(231,123-bf_g*30,8,TFT_BLACK);
+  bf_g=-accY*cos(pitch*DEG_TO_RAD)+accZ*sin(pitch*DEG_TO_RAD);
+  M5.Lcd.drawFastHLine(231,123-bf_g*30,8,TFT_GREEN);
 
   if (mode == 0) {
     //clock
@@ -257,4 +287,5 @@ void loop() {
   if (M5.BtnB.wasPressed()) {
     mode = 1;
   }
+  delay(1);
 }
