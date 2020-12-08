@@ -7,7 +7,8 @@
 #include<Wire.h>
 #include "utility/MahonyAHRS.h"
 
-#include "./Graph.h"
+#include "Graph.h"
+#include "Ins.h"
 
 File f;
 
@@ -37,32 +38,17 @@ Adafruit_NeoPixel pixels = Adafruit_NeoPixel(10,15,NEO_GRB+NEO_KHZ800);
 //IMU
 #define DEG_TO_RAD 0.017453292519943295769236907684886
 
+Ins ins=Ins();
 
-float accX = 0.0F;
-float accY = 0.0F;
-float accZ = 0.0F;
-
-float gyroX = 0.0F;
-float gyroY = 0.0F;
-float gyroZ = 0.0F;
-
-float gyroX0 = 0.0F;
-float gyroY0 = 0.0F;
-float gyroZ0 = 0.0F;
-
-float pitch = 0.0F;
-float roll  = 0.0F;
-float yaw   = 0.0F;
-
-float lastpitch = 0.0F;
-float bf_g=0.0F;
 
 float temp = 0.0F;
 
 uint8_t count = 0;
 
-TFT_eSprite bank = TFT_eSprite(&M5.Lcd);
-TFT_eSprite grav = TFT_eSprite(&M5.Lcd);
+//bank graph G graph
+
+Graph bank_graph = Graph(10,78,61,70,10);
+Graph grav_graph = Graph(250,78,60,71,35);
 
 //ENV2
 Adafruit_BMP280 bme;
@@ -72,12 +58,9 @@ float tmp=0.0F;
 float hum=0.0F;
 float pressure=0.0F;
 
-TFT_eSprite tmp_s = TFT_eSprite(&M5.Lcd);
-TFT_eSprite hum_s =TFT_eSprite(&M5.Lcd);
-TFT_eSprite press_s=TFT_eSprite(&M5.Lcd);
-Graph tmp_graph=Graph(0,40,99,30,&tmp_s);
-Graph hum_graph=Graph(101,40,98,30,&hum_s);
-Graph press_graph = Graph(201,40,118,30,&press_s);
+Graph tmp_graph=Graph(0,40,99,30);
+Graph hum_graph=Graph(101,40,98,30);
+Graph press_graph = Graph(201,40,118,30);
 
 void setup() {
   // put your setup code here, to run once:
@@ -105,31 +88,19 @@ void setup() {
   pixels.begin();
   
   //IMU
-  M5.IMU.Init();
-  M5.IMU.setGyroFsr(M5.IMU.GFS_250DPS);
-  M5.IMU.setAccelFsr(M5.IMU.AFS_8G);
-  M5.IMU.setGyroOffset(700, 1100, -300);
-  for(int i=0;i<100;i++){
-    M5.IMU.getGyroData(&gyroX,&gyroY,&gyroZ);
-    gyroX0+=gyroX/100;
-    gyroY0+=gyroY/100;
-    gyroZ0+=gyroZ/100;
-    delay(10);
-  }
-  //bank graph
-  bank.setColorDepth(4);
-  bank.createSprite(61, 70);
-  bank.fillSprite(TFT_BLUE);
+  ins.init();
+
+  //bank graph G graph
+  bank_graph.init();
+  grav_graph.init();
+  
+ 
   //G graph
-  grav.setColorDepth(3);
-  grav.createSprite(60,70);
-  grav.fillSprite(TFT_BLUE);
   M5.Lcd.drawRect(230, 77, 10, 70, TFT_GREEN);
 
 //ENV2
   bme.begin(0x76);
   sht30.begin(0x44);
-
   tmp_graph.init();
   hum_graph.init();
   press_graph.init();
@@ -171,31 +142,18 @@ void loop() {
   pixels.setPixelColor(0,pixels.Color(0,100,0));
   pixels.show();
   
-  //IMU
-  //M5.IMU.getGyroData(&gyroX,&gyroY,&gyroZ);
-  
   //IMU temp data
-  M5.IMU.getTempData(&temp);
   M5.Lcd.setCursor(120, 0);
-  M5.lcd.print(temp);
+  M5.lcd.print(ins.temp());
   
   //bank graph
   count+=1;
   if (!(count%10)) {
-    //bank and gravity sensor
-    
-    bank.pushSprite(10, 78);
-    for (int i = 0; i <= 60; i += 10) {
-      bank.drawPixel(i, 0, TFT_BLUE);
-    }
-    if(!(count%100)){
-      bank.drawFastHLine(0,0,60,TFT_BLUE);
-      grav.drawFastVLine(0,0,70,TFT_BLUE);
-    }
-    bank.drawPixel(30 + roll / 3, 0, TFT_GREEN);
-    
-    grav.pushSprite(250,78);
-    grav.drawPixel(0,45-bf_g*30,TFT_GREEN);
+    //bank.drawPixel(30 + roll / 3, 0, TFT_GREEN);
+    bank_graph.plotV(30+ins.roll()/3);
+    //grav.pushSprite(250,78);
+    //grav.drawPixel(0,45-bf_g*30,TFT_GREEN);
+    grav_graph.plotH(35-ins.forward_g()*30);
     
   }else if(count%10==1){
     //write SD
@@ -208,13 +166,9 @@ void loop() {
     }
     f=SD.open(filename,FILE_APPEND);
     if(f){
-      f.println(String(pitch)+","+String(roll)+","+String(yaw));
+      f.println(String(ins.pitch())+","+String(ins.roll())+","+String(ins.yaw()));
     }
     f.close();
-  }else if(count%20==2){
-    bank.scroll(0, 1);
-    grav.scroll(1,0 );
-  
   }else if(count==199){
     //ENV2
     count=0;
@@ -235,20 +189,15 @@ void loop() {
     hum_graph.centerPlot(hum*10);
     press_graph.centerPlot(pressure*1000);
   }
-  M5.IMU.getGyroData(&gyroX,&gyroY,&gyroZ);
-  M5.IMU.getAccelData(&accX,&accY,&accZ);
-  //roll indicator
-  //bank angle 
-  M5.Lcd.drawLine(150, 148, 150 + 60 * sin(roll * 6.28 / 360), 148 - 60 * cos(roll * 6.28 / 360), TFT_BLACK);
-  //M5.IMU.getAhrsData(&pitch, &roll, &yaw);
-  MahonyAHRSupdateIMU((gyroX-gyroX0) * DEG_TO_RAD*0.6, (gyroY-gyroY0) * DEG_TO_RAD*0.6, (gyroZ-gyroZ0) * DEG_TO_RAD*0.6, accX, accY, accZ, &roll, &pitch, &yaw);
-  M5.Lcd.drawCircleHelper(150, 148, 70, 0x3, TFT_GREEN);
-  M5.Lcd.drawLine(150, 148, 150 + 60 * sin(roll * 6.28 / 360), 148 - 60 * cos(roll * 6.28 / 360), TFT_GREEN);
 
-  //G indicator
-  M5.Lcd.drawFastHLine(231,123-bf_g*30,8,TFT_BLACK);
-  bf_g=-accY*cos(pitch*DEG_TO_RAD)+accZ*sin(pitch*DEG_TO_RAD);
-  M5.Lcd.drawFastHLine(231,123-bf_g*30,8,TFT_GREEN);
+  //roll indicator G indicator
+  //bank angle
+  M5.Lcd.drawLine(150, 148, 150 + 60 * sin(ins.roll() * 6.28 / 360), 148 - 60 * cos(ins.roll() * 6.28 / 360), TFT_BLACK);
+  M5.Lcd.drawFastHLine(231,123-ins.forward_g()*30,8,TFT_BLACK);
+  ins.reload();
+  M5.Lcd.drawCircleHelper(150, 148, 70, 0x3, TFT_GREEN);
+  M5.Lcd.drawLine(150, 148, 150 + 60 * sin(ins.roll() * 6.28 / 360), 148 - 60 * cos(ins.roll() * 6.28 / 360), TFT_GREEN);
+  M5.Lcd.drawFastHLine(231,123-ins.forward_g()*30,8,TFT_GREEN);
 
   if (mode == 0) {
     //clock
