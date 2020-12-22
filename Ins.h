@@ -22,8 +22,8 @@ class Ins {
     float pitch();
     float roll();
     float yaw();
-    float forward_g();
-    float side_g();
+    float accelG();
+    float sideG();
     float temp();
 
     static int8_t i2c_read(uint8_t dev_id, uint8_t reg_addr, uint8_t *read_data, uint16_t len);

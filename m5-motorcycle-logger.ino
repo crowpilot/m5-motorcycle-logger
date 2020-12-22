@@ -10,8 +10,8 @@
 #include "Graph.h"
 #include "Ins.h"
 #include "Watch.h"
-
-File f;
+#include "httpAP.h"
+#include "logCSV.h"
 
 //gps
 #include <TinyGPS++.h>
@@ -23,7 +23,6 @@ File f;
 //ENV2
 #include<Adafruit_BMP280.h>
 #include<Adafruit_SHT31.h>
-
 
 //GPS
 TinyGPSPlus gps;
@@ -39,7 +38,6 @@ Adafruit_NeoPixel pixels = Adafruit_NeoPixel(10, 15, NEO_GRB + NEO_KHZ800);
 //IMU
 Ins ins = Ins();
 uint8_t count = 0;
-
 //bank graph G graph
 Graph bankGraph = Graph(10, 78, 61, 70, 10);
 Graph gravGraph = Graph(250, 78, 60, 71, 35);
@@ -57,7 +55,12 @@ Graph hum_graph = Graph(101, 40, 98, 30);
 Graph press_graph = Graph(201, 40, 118, 30);
 
 //Clock and Laptime
-Watch watch=Watch();
+Watch watch = Watch(10, 159, 310, 50);
+
+//http server
+
+//logging
+logCSV logcsv;
 
 //xTask
 void refreshIMU(void* arg);
@@ -65,8 +68,14 @@ void refreshIMUGraph(void* arg);
 void refreshENV(void* arg);
 void refreshClock(void* arg);
 void writeData(void* arg);
+void wifiServer(void* arg);
+
+TaskHandle_t xHandleWriteData;
+TaskHandle_t xHandleWifiServer;
 SemaphoreHandle_t xMutex = NULL;
 //
+
+uint8_t mode = 0;
 
 void setup() {
   // put your setup code here, to run once:
@@ -94,11 +103,9 @@ void setup() {
 
   //IMU
   ins.init();
-
   //bank graph G graph
   bankGraph.init();
   gravGraph.init();
-
 
   //G graph
   M5.Lcd.drawRect(230, 77, 10, 70, TFT_GREEN);
@@ -113,24 +120,24 @@ void setup() {
   //clock box
   M5.Lcd.drawRect(20, 215, 80, 25, TFT_GREEN);
 
-  M5.Lcd.setCursor(0, 0);
-  //M5.Lcd.print(modem.getModemInfo());
-  //while(!modem.waitForNetwork());
-  //while(!modem.isNetworkConnected());
-  M5.Lcd.setTextSize(2);
-  //  M5.Lcd.setTextFont(2); not good
+
+
+  //task
   xMutex = xSemaphoreCreateMutex();
   xTaskCreatePinnedToCore(refreshENV, "ENV", 8192, NULL, 1, NULL, 1);
   xTaskCreatePinnedToCore(refreshIMU, "IMU", 8192, NULL, 10, NULL, 1);
   xTaskCreatePinnedToCore(refreshIMUGraph, "IMU", 8192, NULL, 1, NULL, 1);
-  xTaskCreatePinnedToCore(writeData, "writeData", 8192, NULL, 2, NULL, 0);
+  xTaskCreatePinnedToCore(writeData, "writeData", 8192, NULL, 2, &xHandleWriteData, 0);
 }
 
-//mode 0:clock 1:laptimer 2:laptimer running
+
+
 void loop() {
+  //mode 0:clock 1:laptimer 2:laptimer running
+  //refreshServer();
   xSemaphoreTake(xMutex, portMAX_DELAY);
 
-  static uint8_t mode = 0;
+
   //header 3G connection GPS
   //M5.Lcd.print(gps.satellites.value());
   /*if (modem.isNetworkConnected()) {
@@ -143,19 +150,23 @@ void loop() {
   pixels.show();
 
   if (mode == 0) {
-    //clock
-    M5.Lcd.setCursor(10, 159);
-    M5.Lcd.setTextSize(7);
-    M5.Lcd.printf("%02d:%02d", gps.time.hour() + 9, gps.time.minute());
-    M5.Lcd.setTextSize(2);
-    M5.Lcd.printf(".%02d", gps.time.second());
+    //cloc kmode
+    if (gps.satellites.value()) {
+      //adjust clock
+      while (GPSserial.available()) {
+        gps.encode(GPSserial.read());
+      }
+      watch.clockAdjust(gps.time.hour(), gps.time.minute(), gps.time.second());
+    }
+    watch.displayClock();
+
     //bottom
     M5.Lcd.setCursor(120, 220);
     M5.Lcd.print("  LAP  ");
   }
   else if (mode == 1) {
     //Laptimer stop
-
+    watch.displayLap();
     //bottom
     M5.Lcd.drawRect(20, 216, 80, 24, TFT_BLACK);
     //M5.Lcd.fillRect(125,216,80,24,TFT_BLACK);
@@ -163,6 +174,16 @@ void loop() {
     M5.Lcd.print("START");
     M5.Lcd.setCursor(220, 220);
     M5.Lcd.print("RESET");
+  } else if (mode == 2) {
+    //Laptime started
+    M5.Lcd.setCursor(125, 220);
+    M5.Lcd.print("STOP ");
+    M5.Lcd.setCursor(220, 220);
+    M5.Lcd.print("RESET");
+    watch.displayLap();
+  } else if (mode == 10) {
+    //wifi server
+    
   }
 
   //common bottom
@@ -170,15 +191,45 @@ void loop() {
   M5.Lcd.print("clock");
 
   //button setting
-  //lap clock
   M5.update();
   if (M5.BtnA.wasPressed()) {
-    //lap
+    //clock mode
+    watch.resetDisplay();
     mode = 0;
   }
   if (M5.BtnB.wasPressed()) {
-    mode = 1;
+    //lap mode start stop
+    if (mode == 0 ) {
+      //clock to lap stop
+      watch.resetDisplay();
+      mode = 1;
+    } else if (mode == 1) {
+      //lap start
+      mode = 2;
+      watch.startLap();
+    } else if (mode == 2) {
+      //lap stop
+      mode = 1;
+      watch.stopLap();
+    }
   }
+  if (M5.BtnC.wasPressed()) {
+    if (mode == 0) {
+      //lap to wifi mode
+      mode = 10;
+      vTaskSuspend(xHandleWriteData);
+    xTaskCreatePinnedToCore(wifiServer, "writeData", 8192, NULL, 3, &xHandleWifiServer, 0);
+    } else if (mode == 1 or mode == 2) {
+      watch.resetDisplay();
+      watch.stopLap();
+      watch.resetLap();
+      mode = 1;
+    } else if (mode == 10) {
+      vTaskDelete(xHandleWifiServer);
+      vTaskResume(xHandleWriteData);
+    }
+  }
+
   xSemaphoreGive(xMutex);
   vTaskDelay(100);
 }
@@ -190,11 +241,11 @@ void refreshIMU(void* arg) {
     //roll indicator G indicator
     //bank angle
     M5.Lcd.drawLine(150, 148, 150 + 60 * sin(ins.roll() * 6.28 / 360), 148 - 60 * cos(ins.roll() * 6.28 / 360), TFT_BLACK);
-    M5.Lcd.drawFastHLine(231, 123 - ins.forward_g() * 30, 8, TFT_BLACK);
+    M5.Lcd.drawFastHLine(231, 123 + ins.accelG() * 30, 8, TFT_BLACK);
     ins.reload();
     M5.Lcd.drawCircleHelper(150, 148, 70, 0x3, TFT_GREEN);
     M5.Lcd.drawLine(150, 148, 150 + 60 * sin(ins.roll() * 6.28 / 360), 148 - 60 * cos(ins.roll() * 6.28 / 360), TFT_GREEN);
-    M5.Lcd.drawFastHLine(231, 123 - ins.forward_g() * 30, 8, TFT_GREEN);
+    M5.Lcd.drawFastHLine(231, 123 + ins.accelG() * 30, 8, TFT_GREEN);
     xSemaphoreGive(xMutex);
     vTaskDelay(20);
   }
@@ -205,11 +256,11 @@ void refreshIMUGraph(void* arg) {
 
     M5.Lcd.setCursor(120, 0);
     M5.lcd.print(ins.temp());
-    M5.Lcd.setCursor(200,0);
+    M5.Lcd.setCursor(200, 0);
     M5.Lcd.print(ins.yaw());
 
     bankGraph.plotV(30 + ins.roll() / 3);
-    gravGraph.plotH(35 - ins.forward_g() * 30);
+    gravGraph.plotH(35 - ins.accelG() * 30);
 
     xSemaphoreGive(xMutex);
     vTaskDelay(100);
@@ -239,43 +290,43 @@ void refreshENV(void* arg) {
     vTaskDelay(10000);
   }
 }
-void refreshClock(void* arg) {
 
-}
 void writeData(void* arg) {
-  float yaw, roll, pitch,temp;
+  float yaw, roll, pitch, temp;
   for (;;) {
     if (GPSserial.available()) {
       gps.encode(GPSserial.read());
 
     }
-
     xSemaphoreTake(xMutex, portMAX_DELAY);
-
-    yaw = ins.yaw();
-    roll = ins.roll();
-    pitch = ins.pitch();
+    logcsv.setAHRS(ins.pitch(), ins.roll(), ins.yaw());
+    logcsv.setG(ins.accelG(), 0);
     if (gps.satellites.value()) {
-      M5.Lcd.setCursor(60, 0);
-      M5.Lcd.printf("GPS%1d", gps.satellites.value());
-    }
 
+    }
+    if (mode == 0 or mode == 1) {
+      logcsv.setInterval(10000);//0.1hz
+    } else if (mode == 2) {
+      logcsv.setInterval(100);//10hz
+    }
     xSemaphoreGive(xMutex);
-    
-    //write SD
-    static char filename[100];
-    if (gps.satellites.value()) {
-      sprintf(filename, "/%04d-%02d-%02d-%02d:00.csv"
-              , gps.date.year(), gps.date.month(), gps.date.day(), gps.time.hour());
-    } else {
-      sprintf(filename, "/log.csv");
-    }
-    f = SD.open(filename, FILE_APPEND);
-    if (f) {
-      f.println(String(pitch) + "," + String(roll) + "," + String(yaw));
-    }
-    f.close();
 
-    vTaskDelay(100);
+    //write SD
+    logcsv.writeCSV();
+
+    vTaskDelay(logcsv.getInterval());
+  }
+}
+
+void wifiServer(void* arg) {
+  //wifi server
+  xSemaphoreTake(xMutex, portMAX_DELAY);
+  initServer();
+  xSemaphoreGive(xMutex);
+  for (;;) {
+    //xSemaphoreTake(xMutex, portMAX_DELAY);
+    refreshServer();
+    //xSemaphoreGive(xMutex);
+    vTaskDelay(10);
   }
 }
