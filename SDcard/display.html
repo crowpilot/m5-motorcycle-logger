@@ -1,0 +1,23 @@
+<html>
+  <head>
+    <meta content="text/html;charset=utf-8" http-equiv="Content-Type">
+<meta content="utf-8" http-equiv="encoding">
+<script type="text/javascript" src="d3.min.js"></script>
+    
+  </head>
+  <body>
+  <script>
+  var csvfile=location.search.substring(5);
+  d3.csv(csvfile).then(function(data){
+        //console.log(data);
+        var text="";
+        for(var i=0;i<data.length;i++){
+        text+="pitch"+data[i].pitch+"yaw"+data[i].yaw+"roll"+data[i].roll+"<br>";
+        }
+        d3.select("#test").html(text);
+    });
+    </script>
+    <div id="test"></div>
+test
+  </body>
+</html>

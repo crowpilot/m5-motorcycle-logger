@@ -1,0 +1,22 @@
+<html>
+  <head>
+    <meta content="text/html;charset=utf-8" http-equiv="Content-Type">
+<meta content="utf-8" http-equiv="encoding">
+<script type="text/javascript" src="d3.min.js"></script>
+    
+  </head>
+  <body>
+  <script>
+d3.json("/list?dir=/log").then(function(data){
+        //console.log(data);
+        var text="";
+        for(var i=0;i<data.length;i++){
+        //text+=data[i].name;
+        			  d3.select("#test").append("div").append("a").attr("href","/display.html?csv="+data[i].name).text(data[i].name);
+        }
+        
+    });
+    </script>
+<div id="test">test</div>
+  </body>
+</html>

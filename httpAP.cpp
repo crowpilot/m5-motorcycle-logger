@@ -59,7 +59,12 @@ bool loadFromSdCard(String path) {
     path = path.substring(0, path.lastIndexOf("."));
   } else if (path.endsWith(".htm")) {
     dataType = "text/html";
-  } else if (path.endsWith(".css")) {
+  } else if (path.endsWith(".html")) {
+    dataType = "text/html";
+  } else if (path.endsWith(".csv")) {
+    dataType = "text/csv";
+  } 
+  else if (path.endsWith(".css")) {
     dataType = "text/css";
   } else if (path.endsWith(".js")) {
     dataType = "application/javascript";

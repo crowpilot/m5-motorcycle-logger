@@ -32,12 +32,17 @@ void logCSV::setTime(int years,int months,int days,int hours,int minutes,int sec
 
 void logCSV::writeCSV(){
   char filename[100];
+  bool header=false;
   if (_years) {
-      sprintf(filename, "/%04d-%02d-%02d-%02d:00.csv"
+      sprintf(filename, "/log/%04d-%02d-%02d-%02d:00.csv"
               ,_years,_months,_days,_hours);
     } else {
-      sprintf(filename, "/log.csv");
+      sprintf(filename, "/log/log.csv");
     }
+
+  if(!SD.exists(filename)){
+    header=true;
+  }
   //timestamp,minutes,seconds,latitude,logitude,pitch,roll,yaw,accelG,sideG
   String csv=String(millis())+","+String(_minutes)+","+String(_seconds)+","
   +","+String(_latitude)+","+String(_longitude)
@@ -46,6 +51,9 @@ void logCSV::writeCSV(){
 
   f = SD.open(filename, FILE_APPEND);
     if (f) {
+      if(header){
+        f.println("timestamp,minutes,seconds,latitude,logitude,pitch,roll,yaw,accelG,sideG");
+      }
       f.println(csv);
     }
     f.close();

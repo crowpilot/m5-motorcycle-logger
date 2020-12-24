@@ -324,9 +324,9 @@ void wifiServer(void* arg) {
   initServer();
   xSemaphoreGive(xMutex);
   for (;;) {
-    //xSemaphoreTake(xMutex, portMAX_DELAY);
+    xSemaphoreTake(xMutex, portMAX_DELAY);
     refreshServer();
-    //xSemaphoreGive(xMutex);
-    vTaskDelay(10);
+    xSemaphoreGive(xMutex);
+    vTaskDelay(1);
   }
 }
