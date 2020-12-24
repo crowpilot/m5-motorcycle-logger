@@ -45,9 +45,9 @@ void logCSV::writeCSV(){
   }
   //timestamp,minutes,seconds,latitude,logitude,pitch,roll,yaw,accelG,sideG
   String csv=String(millis())+","+String(_minutes)+","+String(_seconds)+","
-  +","+String(_latitude)+","+String(_longitude)
-  +String(_pitch)+","+String(_roll)+","+String(_yaw)
-  +","+String(_accelG)+","+String(_sideG);
+  +String(_latitude)+","+String(_longitude)+","
+  +String(_pitch)+","+String(_roll)+","+String(_yaw)+","
+  +String(_accelG)+","+String(_sideG);
 
   f = SD.open(filename, FILE_APPEND);
     if (f) {
