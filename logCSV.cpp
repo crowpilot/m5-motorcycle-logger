@@ -52,7 +52,7 @@ void logCSV::writeCSV(){
   f = SD.open(filename, FILE_APPEND);
     if (f) {
       if(header){
-        f.println("timestamp,minutes,seconds,latitude,logitude,pitch,roll,yaw,accelG,sideG");
+        f.println("timestamp,minutes,seconds,latitude,longitude,pitch,roll,yaw,accelG,sideG");
       }
       f.println(csv);
     }
