@@ -8,16 +8,178 @@
   <body>
   <script>
   var csvfile=location.search.substring(5);
+  
   d3.csv(csvfile).then(function(data){
-        //console.log(data);
-        var text="";
-        for(var i=0;i<data.length;i++){
-        text+="pitch"+data[i].pitch+"yaw"+data[i].yaw+"roll"+data[i].roll+"<br>";
-        }
-        d3.select("#test").html(text);
+        var width = 400; // グラフの幅
+  var height = 300; // グラフの高さ
+  var margin = { "top": 30, "bottom": 60, "right": 30, "left": 60 };
+ 
+  //svg
+  var svgGPS=d3.select("#gps").append("svg").attr("width",width)
+  .attr("height",height);
+  var svg = d3.select("#Graph1").append("svg").attr("width",width)
+  .attr("height", height);
+ 
+  // SCALE
+  //GPS
+  var xScaleGPS = d3.scaleLinear()
+    .domain([d3.min(data,
+    function(d){if(d.longitude>0){return d.longitude;}
+    else{return 180;}}), 
+    d3.max(data,
+    function(d) {if(d.longitude>0){return d.longitude;}
+    else{return 0;}})])
+    .range([margin.left, width - margin.right]);
+    
+  var yScaleGPS=d3.scaleLinear()
+    .domain([d3.min(data,
+    function(d){if(d.latitude>0){return d.latitude;}
+    else{return 180;}}), 
+    d3.max(data, 
+    function(d) { if(d.latitude>0){return d.latitude;}
+    else{return 0;} })])
+    .range([height-margin.bottom,margin.top]);
+
+  
+  //DATA
+  var xScale = d3.scaleLinear()
+    .domain([0, d3.max(data, function(d) { return d.timestamp; })])
+    .range([margin.left, width - margin.right]);
+ 
+  var yScale = d3.scaleLinear()
+    .domain([-90, 90])
+    .range([height - margin.bottom, margin.top]);
+    
+  var yScaleG=d3.scaleLinear()
+    .domain([-1,1])
+    .range([height-margin.bottom,margin.top]);
+    
+ 
+  // set Axis
+  //GPS
+  var axisxGPS = d3.axisBottom(xScaleGPS).ticks(5);
+  var axisyGPS = d3.axisLeft(yScaleGPS).ticks(5);
+  //DATA
+  var axisx = d3.axisBottom(xScale).ticks(5);
+  var axisy = d3.axisLeft(yScale).ticks(5);
+  var axisyG= d3.axisRight(yScaleG).ticks(5);
+  
+  //GPS
+  svgGPS.append("g")
+    .attr("transform", "translate(" + 0 + "," + (height - margin.bottom) + ")")
+    .call(axisxGPS)
+    .append("text")
+    .attr("fill", "black")
+    .attr("x", (width - margin.left - margin.right) / 2 + margin.left)
+    .attr("y", 35)
+    .attr("text-anchor", "middle")
+    .attr("font-size", "10pt")
+    .attr("font-weight", "bold")
+    .text("longitude");
+ 
+  svgGPS.append("g")
+    .attr("transform", "translate(" + margin.left + "," + 0 + ")")
+    .call(axisyGPS)
+    .append("text")
+    .attr("fill", "black")
+    .attr("x", -(height - margin.top - margin.bottom) / 2 - margin.top)
+    .attr("y", -35)
+    .attr("transform", "rotate(-90)")
+    .attr("text-anchor", "middle")
+    .attr("font-weight", "bold")
+    .attr("font-size", "10pt")
+    .text("latitude");
+ //DATA
+  svg.append("g")
+    .attr("transform", "translate(" + 0 + "," + (height - margin.bottom) + ")")
+    .call(axisx)
+    .append("text")
+    .attr("fill", "black")
+    .attr("x", (width - margin.left - margin.right) / 2 + margin.left)
+    .attr("y", 35)
+    .attr("text-anchor", "middle")
+    .attr("font-size", "10pt")
+    .attr("font-weight", "bold")
+    .text("timestamp");
+ 
+  svg.append("g")
+    .attr("transform", "translate(" + margin.left + "," + 0 + ")")
+    .call(axisy)
+    .append("text")
+    .attr("fill", "black")
+    .attr("x", -(height - margin.top - margin.bottom) / 2 - margin.top)
+    .attr("y", -35)
+    .attr("transform", "rotate(-90)")
+    .attr("text-anchor", "middle")
+    .attr("font-weight", "bold")
+    .attr("font-size", "10pt")
+    .text("data");
+ 
+  //DATA
+  svgGPS.append("g")
+    .selectAll("circle")
+    .data(data)
+    .enter()
+    .append("circle")
+    .attr("cx", function(d) { return xScaleGPS(d.longitude); })
+    .attr("cy", function(d) { return yScaleGPS(d.latitude); })
+    .attr("fill", "steelblue")
+    .attr("r", 4);
+  
+  svg.append("path")
+    .datum(data)
+    .attr("fill", "none")
+    .attr("stroke", "red")
+    .attr("stroke-width", 1.5)
+    .attr("d", d3.line()
+      .x(function(d) { return xScale(d.timestamp); })
+      .y(function(d) { return yScale(d.roll); }));
+      
+   svg.append("path")
+    .datum(data)
+    .attr("fill", "none")
+    .attr("stroke", "pink")
+    .attr("stroke-width", 1.5)
+    .attr("d", d3.line()
+      .x(function(d) { return xScale(d.timestamp); })
+      .y(function(d) { return yScaleG(d.sideG); }));
+      
+   svg.append("path")
+    .datum(data)
+    .attr("fill", "none")
+    .attr("stroke", "green")
+    .attr("stroke-width", 1.5)
+    .attr("d", d3.line()
+      .x(function(d) { return xScale(d.timestamp); })
+      .y(function(d) { return yScale(d.pitch); }));
+      
+   svg.append("path")
+    .datum(data)
+    .attr("fill", "none")
+    .attr("stroke", "greenyellow")
+    .attr("stroke-width", 1.5)
+    .attr("d", d3.line()
+      .x(function(d) { return xScale(d.timestamp); })
+      .y(function(d) { return yScaleG(d.accelG); }));
+  /*svg.append("circle")
+    .selectAll("circle")
+    .data(data)
+    .enter()
+    .append("circle")
+    .attr("cx", function(d) { return xScale(d.pitch); })
+    .attr("cy", function(d) { return yScale(d.roll); })
+    .attr("fill", "steelblue")
+    .attr("r", 4);*/
+    d3.select("#title").text(csvfile);
     });
     </script>
+    <h1 id="title"></h1>
+    <h3><font color="blue">GPS plot</font></h3>
+    <div id="gps"></div>
+    <h3><font color="red">Roll</font>/<font color="green">Pitch</font></h3>
+    <div id="Graph1"></div>
     <div id="test"></div>
-test
   </body>
 </html>
+
+

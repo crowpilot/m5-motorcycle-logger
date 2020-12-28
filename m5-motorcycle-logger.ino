@@ -151,12 +151,15 @@ void loop() {
 
   if (mode == 0) {
     //cloc kmode
-    if (gps.satellites.value()) {
+    if (GPSserial.available()) {
       //adjust clock
-      while (GPSserial.available()) {
-        gps.encode(GPSserial.read());
+
+      gps.encode(GPSserial.read());
+      if (gps.time.minute()) {
+        watch.clockAdjust(gps.time.hour(), gps.time.minute(), gps.time.second());
+        logcsv.setTime(gps.date.year(), gps.date.month(), gps.date.day(), watch.getHours(), watch.getMinutes(), watch.getSeconds());
+
       }
-      watch.clockAdjust(gps.time.hour(), gps.time.minute(), gps.time.second());
     }
     watch.displayClock();
 
@@ -183,7 +186,7 @@ void loop() {
     watch.displayLap();
   } else if (mode == 10) {
     //wifi server
-    
+
   }
 
   //common bottom
@@ -218,7 +221,7 @@ void loop() {
       //lap to wifi mode
       mode = 10;
       vTaskSuspend(xHandleWriteData);
-    xTaskCreatePinnedToCore(wifiServer, "writeData", 8192, NULL, 3, &xHandleWifiServer, 0);
+      xTaskCreatePinnedToCore(wifiServer, "writeData", 8192, NULL, 3, &xHandleWifiServer, 0);
     } else if (mode == 1 or mode == 2) {
       watch.resetDisplay();
       watch.stopLap();
@@ -294,18 +297,17 @@ void refreshENV(void* arg) {
 void writeData(void* arg) {
   float yaw, roll, pitch, temp;
   for (;;) {
-    if (GPSserial.available()) {
-      gps.encode(GPSserial.read());
 
-    }
     xSemaphoreTake(xMutex, portMAX_DELAY);
+
+    logcsv.setGPS(gps.location.lat(), gps.location.lng());
     logcsv.setAHRS(ins.pitch(), ins.roll(), ins.yaw());
     logcsv.setG(ins.accelG(), 0);
     if (gps.satellites.value()) {
 
     }
     if (mode == 0 or mode == 1) {
-      logcsv.setInterval(10000);//0.1hz
+      logcsv.setInterval(1000);//1hz
     } else if (mode == 2) {
       logcsv.setInterval(100);//10hz
     }

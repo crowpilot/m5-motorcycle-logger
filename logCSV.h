@@ -8,7 +8,7 @@ class logCSV{
     void setAHRS(float pitch,float roll ,float yaw);
     void setG(float accelG=0,float sideG=0);
     void setGPS(float latitude=0,float longitude=0);
-    void setTime(int years,int months,int days,int hours,int minutes,int seconds);
+    void setTime(uint16_t years,uint8_t months,uint8_t days,uint8_t hours,uint8_t minutes,uint8_t seconds);
     //void setTime();
 
     void writeCSV();
@@ -21,12 +21,17 @@ class logCSV{
     float _yaw;
     float _accelG;
     float _sideG;
-    int _interval=1000;
+    int _interval=100;
     float _latitude;
     float _longitude;
-    File f;
 
-    int _years,_months,_days,_hours,_minutes,_seconds;
+    uint16_t _years;
+    uint8_t _months;
+    uint8_t _days;
+    uint8_t _hours;
+    uint8_t _minutes;
+    uint8_t _seconds;
+    File f;
     //int rpm
     
 };

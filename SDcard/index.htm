@@ -12,11 +12,13 @@ d3.json("/list?dir=/log").then(function(data){
         var text="";
         for(var i=0;i<data.length;i++){
         //text+=data[i].name;
-        			  d3.select("#test").append("div").append("a").attr("href","/display.html?csv="+data[i].name).text(data[i].name);
+        			  d3.select("#datalist").append("div").append("a").attr("href","/display.html?csv="+data[i].name).text(data[i].name);
         }
         
     });
     </script>
-<div id="test">test</div>
+<h1>CROW's MOTO LOGGER</h1>
+<div>select data</div>
+<div id="datalist"></div>
   </body>
 </html>
