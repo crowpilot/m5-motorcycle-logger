@@ -151,16 +151,7 @@ void loop() {
 
   if (mode == 0) {
     //cloc kmode
-    if (GPSserial.available()) {
-      //adjust clock
 
-      gps.encode(GPSserial.read());
-      if (gps.time.minute()) {
-        watch.clockAdjust(gps.time.hour(), gps.time.minute(), gps.time.second());
-        logcsv.setTime(gps.date.year(), gps.date.month(), gps.date.day(), watch.getHours(), watch.getMinutes(), watch.getSeconds());
-
-      }
-    }
     watch.displayClock();
 
     //bottom
@@ -297,15 +288,26 @@ void refreshENV(void* arg) {
 void writeData(void* arg) {
   float yaw, roll, pitch, temp;
   for (;;) {
-
-    xSemaphoreTake(xMutex, portMAX_DELAY);
-
-    logcsv.setGPS(gps.location.lat(), gps.location.lng());
-    logcsv.setAHRS(ins.pitch(), ins.roll(), ins.yaw());
-    logcsv.setG(ins.accelG(), 0);
+    if (GPSserial.available()) {
+      //adjust clock
+      gps.encode(GPSserial.read());
+      if (gps.time.minute()) {
+        watch.clockAdjust(gps.time.hour(), gps.time.minute(), gps.time.second());
+        logcsv.setTime(gps.date.year(), gps.date.month(), gps.date.day(), watch.getHours(), watch.getMinutes(), watch.getSeconds());
+      }
+    }
     if (gps.satellites.value()) {
 
     }
+    logcsv.setGPS(gps.location.lat(), gps.location.lng());
+    
+    xSemaphoreTake(xMutex, portMAX_DELAY);
+    M5.Lcd.setCursor(0,0);
+    M5.Lcd.setTextSize(2);
+    M5.Lcd.print(gps.satellites.value());
+    logcsv.setAHRS(ins.pitch(), ins.roll(), ins.yaw());
+    logcsv.setG(ins.accelG(), 0);
+    
     if (mode == 0 or mode == 1) {
       logcsv.setInterval(1000);//1hz
     } else if (mode == 2) {
