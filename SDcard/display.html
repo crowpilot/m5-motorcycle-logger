@@ -39,6 +39,10 @@
     function(d) { if(d.latitude>0){return d.latitude;}
     else{return 0;} })])
     .range([height-margin.bottom,margin.top]);
+    
+    var color=d3.scaleLinear()
+    .domain([0,20,45,90])
+    .range(["green","yellow","red","red"]);
 
   
   //DATA
@@ -123,7 +127,7 @@
     .append("circle")
     .attr("cx", function(d) { return xScaleGPS(d.longitude); })
     .attr("cy", function(d) { return yScaleGPS(d.latitude); })
-    .attr("fill", "steelblue")
+    .attr("fill", function(d){return color(Math.round(Math.abs(d.roll)));})
     .attr("r", 4);
   
   svg.append("path")
