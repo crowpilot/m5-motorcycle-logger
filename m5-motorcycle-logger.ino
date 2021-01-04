@@ -7,12 +7,12 @@
 #include<Wire.h>
 #include "utility/MahonyAHRS.h"
 
+#include "Dashboard.h"
 #include "Graph.h"
 #include "Ins.h"
 #include "Watch.h"
 #include "httpAP.h"
 #include "logCSV.h"
-
 //gps
 #include <TinyGPS++.h>
 //3G
@@ -55,6 +55,7 @@ Graph hum_graph = Graph(101, 40, 98, 30);
 Graph press_graph = Graph(201, 40, 118, 30);
 
 //Clock and Laptime
+Dashboard dashboard;
 Watch watch = Watch(10, 159, 310, 50);
 
 //http server
@@ -120,7 +121,7 @@ void setup() {
   //clock box
   M5.Lcd.drawRect(20, 215, 80, 25, TFT_GREEN);
 
-
+  dashboard.bottomButton(String("clock"),String("LAP"),String("Data"));
 
   //task
   xMutex = xSemaphoreCreateMutex();
@@ -153,36 +154,14 @@ void loop() {
     //cloc kmode
 
     watch.displayClock();
-
-    //bottom
-    M5.Lcd.setCursor(120, 220);
-    M5.Lcd.print("  LAP  ");
   }
   else if (mode == 1) {
     //Laptimer stop
     watch.displayLap();
-    //bottom
-    M5.Lcd.drawRect(20, 216, 80, 24, TFT_BLACK);
-    //M5.Lcd.fillRect(125,216,80,24,TFT_BLACK);
-    M5.Lcd.setCursor(125, 220);
-    M5.Lcd.print("START");
-    M5.Lcd.setCursor(220, 220);
-    M5.Lcd.print("RESET");
   } else if (mode == 2) {
-    //Laptime started
-    M5.Lcd.setCursor(125, 220);
-    M5.Lcd.print("STOP ");
-    M5.Lcd.setCursor(220, 220);
-    M5.Lcd.print("RESET");
+    //Laptime started    
     watch.displayLap();
-  } else if (mode == 10) {
-    //wifi server
-
-  }
-
-  //common bottom
-  M5.Lcd.setCursor(30, 220);
-  M5.Lcd.print("clock");
+  } 
 
   //button setting
   M5.update();
@@ -190,6 +169,7 @@ void loop() {
     //clock mode
     watch.resetDisplay();
     mode = 0;
+    dashboard.bottomButton(String("clock"),String("LAP"),String("Data"));
   }
   if (M5.BtnB.wasPressed()) {
     //lap mode start stop
@@ -197,13 +177,16 @@ void loop() {
       //clock to lap stop
       watch.resetDisplay();
       mode = 1;
+      dashboard.bottomButton(String("clock"),String("START"),String("RESET"));
     } else if (mode == 1) {
       //lap start
       mode = 2;
+      dashboard.bottomButton(String("clock"),String("STOP"),String("RESET"));
       watch.startLap();
     } else if (mode == 2) {
       //lap stop
       mode = 1;
+      dashboard.bottomButton(String("clock"),String("START"),String("RESET"));
       watch.stopLap();
     }
   }
@@ -211,6 +194,7 @@ void loop() {
     if (mode == 0) {
       //lap to wifi mode
       mode = 10;
+      dashboard.bottomButton(String(""),String(""),String(""));
       vTaskSuspend(xHandleWriteData);
       xTaskCreatePinnedToCore(wifiServer, "writeData", 8192, NULL, 3, &xHandleWifiServer, 0);
     } else if (mode == 1 or mode == 2) {
@@ -248,6 +232,7 @@ void refreshIMUGraph(void* arg) {
   for (;;) {
     xSemaphoreTake(xMutex, portMAX_DELAY);
 
+//test
     M5.Lcd.setCursor(120, 0);
     M5.lcd.print(ins.temp());
     M5.Lcd.setCursor(200, 0);
@@ -286,6 +271,8 @@ void refreshENV(void* arg) {
 }
 
 void writeData(void* arg) {
+  //core 0
+  //write SD card
   float yaw, roll, pitch, temp;
   for (;;) {
     if (GPSserial.available()) {
@@ -323,6 +310,8 @@ void writeData(void* arg) {
 }
 
 void wifiServer(void* arg) {
+  //core 0
+  //stop all
   //wifi server
   xSemaphoreTake(xMutex, portMAX_DELAY);
   initServer();

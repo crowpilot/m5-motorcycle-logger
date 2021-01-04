@@ -7,6 +7,7 @@ class Dashboard{
     Dashboard();
     void createMeter(uint8_t x,uint8_t y,uint8_t r);
     void updateMeter(float val);
+    void bottomButton(String left,String center,String right);
 
     void createVBar();
     void updateVBar();
