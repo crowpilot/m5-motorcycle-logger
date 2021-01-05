@@ -46,10 +46,6 @@ Graph gravGraph = Graph(250, 78, 60, 71, 35);
 Adafruit_BMP280 bme;
 Adafruit_SHT31 sht30 = Adafruit_SHT31();
 
-float tmp = 0.0F;
-float hum = 0.0F;
-float pressure = 0.0F;
-
 Graph tmp_graph = Graph(0, 40, 99, 30);
 Graph hum_graph = Graph(101, 40, 98, 30);
 Graph press_graph = Graph(201, 40, 118, 30);
@@ -74,23 +70,12 @@ void wifiServer(void* arg);
 TaskHandle_t xHandleWriteData;
 TaskHandle_t xHandleWifiServer;
 SemaphoreHandle_t xMutex = NULL;
-//
-
-uint8_t mode = 0;
 
 void setup() {
   // put your setup code here, to run once:
   M5.begin();
   M5.Power.begin();
   Wire.begin();
-
-  M5.Lcd.drawFastHLine(0, 20, 320, TFT_GREEN);
-  M5.Lcd.drawFastVLine(100, 20, 50, TFT_GREEN);
-  M5.Lcd.drawFastVLine(200, 20, 50, TFT_GREEN);
-  M5.Lcd.drawFastHLine(0, 39, 320, TFT_NAVY);
-  M5.Lcd.drawFastHLine(0, 70, 320, TFT_GREEN);
-  M5.Lcd.drawFastHLine(0, 152, 320, TFT_GREEN);
-  M5.Lcd.drawFastHLine(0, 215, 320, TFT_GREEN);
 
   //GPS
   GPSserial.begin(9600, SERIAL_8N1, 36, 26);
@@ -119,9 +104,8 @@ void setup() {
   press_graph.init();
 
   //clock box
-  M5.Lcd.drawRect(20, 215, 80, 25, TFT_GREEN);
-
-  dashboard.bottomButton(String("clock"),String("LAP"),String("Data"));
+  dashboard.init();
+  dashboard.bottomButton(String("clock"), String("LAP"), String("Data"));
 
   //task
   xMutex = xSemaphoreCreateMutex();
@@ -150,61 +134,36 @@ void loop() {
   pixels.setPixelColor(0, pixels.Color(0, 100, 0));
   pixels.show();
 
-  if (mode == 0) {
-    //cloc kmode
-
-    watch.displayClock();
-  }
-  else if (mode == 1) {
-    //Laptimer stop
-    watch.displayLap();
-  } else if (mode == 2) {
-    //Laptime started    
-    watch.displayLap();
-  } 
+  watch.displayWatch();
 
   //button setting
   M5.update();
   if (M5.BtnA.wasPressed()) {
     //clock mode
     watch.resetDisplay();
-    mode = 0;
-    dashboard.bottomButton(String("clock"),String("LAP"),String("Data"));
+    watch.clockMode();
+    dashboard.bottomButton(String("clock"), String("LAP"), String("Data"));
   }
   if (M5.BtnB.wasPressed()) {
     //lap mode start stop
-    if (mode == 0 ) {
-      //clock to lap stop
+    if (watch.isClock()) {
       watch.resetDisplay();
-      mode = 1;
-      dashboard.bottomButton(String("clock"),String("START"),String("RESET"));
-    } else if (mode == 1) {
-      //lap start
-      mode = 2;
-      dashboard.bottomButton(String("clock"),String("STOP"),String("RESET"));
-      watch.startLap();
-    } else if (mode == 2) {
-      //lap stop
-      mode = 1;
-      dashboard.bottomButton(String("clock"),String("START"),String("RESET"));
-      watch.stopLap();
+      watch.lapMode();
+      dashboard.bottomButton(String("clock"), watch.getButton(), String("RESET"));
+    } else {
+      watch.toggleLap();
+      dashboard.bottomButton(String("clock"), watch.getButton(), String("RESET"));
     }
   }
   if (M5.BtnC.wasPressed()) {
-    if (mode == 0) {
+    if (watch.isClock()) {
       //lap to wifi mode
-      mode = 10;
-      dashboard.bottomButton(String(""),String(""),String(""));
+      dashboard.bottomButton(String(""), String(""), String(""));
       vTaskSuspend(xHandleWriteData);
       xTaskCreatePinnedToCore(wifiServer, "writeData", 8192, NULL, 3, &xHandleWifiServer, 0);
-    } else if (mode == 1 or mode == 2) {
-      watch.resetDisplay();
+    } else {
       watch.stopLap();
       watch.resetLap();
-      mode = 1;
-    } else if (mode == 10) {
-      vTaskDelete(xHandleWifiServer);
-      vTaskResume(xHandleWriteData);
     }
   }
 
@@ -232,7 +191,7 @@ void refreshIMUGraph(void* arg) {
   for (;;) {
     xSemaphoreTake(xMutex, portMAX_DELAY);
 
-//test
+    //test
     M5.Lcd.setCursor(120, 0);
     M5.lcd.print(ins.temp());
     M5.Lcd.setCursor(200, 0);
@@ -247,12 +206,16 @@ void refreshIMUGraph(void* arg) {
 }
 
 void refreshENV(void* arg) {
+  float tmp=0.0F;
+  float hum=0.0F;
+  float pressure=0.0F;
   for (;;) {
-    xSemaphoreTake(xMutex, portMAX_DELAY);
-
     tmp = sht30.readTemperature();
     hum = sht30.readHumidity();
     pressure = bme.readPressure() * 0.0002953;
+    
+    xSemaphoreTake(xMutex, portMAX_DELAY);
+
     M5.Lcd.setTextSize(2);
     M5.Lcd.setCursor(0, 22);
     M5.Lcd.printf("%2.1fC", tmp);
@@ -287,17 +250,17 @@ void writeData(void* arg) {
 
     }
     logcsv.setGPS(gps.location.lat(), gps.location.lng());
-    
+
     xSemaphoreTake(xMutex, portMAX_DELAY);
-    M5.Lcd.setCursor(0,0);
+    M5.Lcd.setCursor(0, 0);
     M5.Lcd.setTextSize(2);
     M5.Lcd.print(gps.satellites.value());
     logcsv.setAHRS(ins.pitch(), ins.roll(), ins.yaw());
     logcsv.setG(ins.accelG(), 0);
-    
-    if (mode == 0 or mode == 1) {
+
+    if (watch.isClock()) {
       logcsv.setInterval(1000);//1hz
-    } else if (mode == 2) {
+    } else {
       logcsv.setInterval(100);//10hz
     }
     xSemaphoreGive(xMutex);

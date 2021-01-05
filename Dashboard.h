@@ -5,6 +5,7 @@
 class Dashboard{
   public:
     Dashboard();
+    void init();
     void createMeter(uint8_t x,uint8_t y,uint8_t r);
     void updateMeter(float val);
     void bottomButton(String left,String center,String right);

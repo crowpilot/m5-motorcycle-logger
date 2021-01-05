@@ -6,20 +6,69 @@ Watch::Watch(int x, int y, int w, int h) {
   _y = y;
   _w=w;
   _h=h;
-  
 }
 
 void Watch::init() {
   
 }
 
+void Watch::displayWatch(){
+  if (_mode == 0) {
+    //cloc kmode
+    Watch::displayClock();
+  }
+  else if (_mode == 1 or _mode==2) {
+    //Laptimer stop
+    Watch::displayLap();
+  } 
+}
+
+bool Watch::isClock(){
+  if(_mode==0){
+    return true;
+  }else{
+    return false;
+  }
+}
+
+void Watch::toggleLap(){
+  if(_mode==1){
+    Watch::startLap();
+  }else{
+    Watch::stopLap();
+  }
+}
+
+String Watch::getButton(){
+  if(_mode==1){
+    //stop mode
+    return String("START");
+  }else{
+    return String("STOP");
+  }
+}
+
+void Watch::clockMode(){
+  _mode=0;
+}
+
+void Watch::lapMode(){
+  if(_startMillis == 0){
+    _mode=1;
+  }else{
+    _mode=2;
+  }
+}
+
 void Watch::startLap() {
   _startMillis = millis();
+  _mode=2;//lap started
 }
 
 void Watch::stopLap(){
   _lastLap=millis()-_startMillis+_lastLap;
   _startMillis=0;
+  _mode=1;//lap stop
 }
 
 unsigned long Watch::lapTime() {
@@ -33,6 +82,8 @@ unsigned long Watch::lapTime() {
 void Watch::resetLap() {
   _startMillis = 0;
   _lastLap=0;
+  _mode=1;
+  Watch::resetDisplay();
 }
 
 void Watch::displayLap() {

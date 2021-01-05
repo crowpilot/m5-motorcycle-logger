@@ -5,6 +5,16 @@ Dashboard::Dashboard(){
   
 }
 
+void Dashboard::init(){
+  M5.Lcd.drawFastHLine(0, 20, 320, TFT_GREEN);
+  M5.Lcd.drawFastVLine(100, 20, 50, TFT_GREEN);
+  M5.Lcd.drawFastVLine(200, 20, 50, TFT_GREEN);
+  M5.Lcd.drawFastHLine(0, 39, 320, TFT_NAVY);
+  M5.Lcd.drawFastHLine(0, 70, 320, TFT_GREEN);
+  M5.Lcd.drawFastHLine(0, 152, 320, TFT_GREEN);
+  M5.Lcd.drawFastHLine(0, 215, 320, TFT_GREEN);
+}
+
 void Dashboard::createMeter(uint8_t x,uint8_t y,uint8_t r){
   //top 0
 }
