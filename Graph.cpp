@@ -15,10 +15,6 @@ Graph::Graph(uint8_t x,uint8_t y,uint8_t w,uint8_t h,uint8_t mesh){
   _center=_h/2;
 }
 
-void Graph::init(){
-  _graph.pushSprite(_x,_y);
-}
-
 void Graph::centerPlot(int val){
   _graph.pushSprite(_x,_y);
   _graph.scroll(1,(val-_lastval));

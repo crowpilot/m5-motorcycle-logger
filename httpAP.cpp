@@ -31,10 +31,6 @@ void initServer(){
   server.onNotFound(handleNotFound);
 
   server.begin();
-  while (1){
-    server.handleClient();
-    delay(1);
-  }
 }
 
 void refreshServer(){

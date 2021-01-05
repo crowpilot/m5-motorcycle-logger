@@ -37,7 +37,7 @@ Adafruit_NeoPixel pixels = Adafruit_NeoPixel(10, 15, NEO_GRB + NEO_KHZ800);
 
 //IMU
 Ins ins = Ins();
-uint8_t count = 0;
+
 //bank graph G graph
 Graph bankGraph = Graph(10, 78, 61, 70, 10);
 Graph gravGraph = Graph(250, 78, 60, 71, 35);
@@ -89,9 +89,6 @@ void setup() {
 
   //IMU
   ins.init();
-  //bank graph G graph
-  bankGraph.init();
-  gravGraph.init();
 
   //G graph
   M5.Lcd.drawRect(230, 77, 10, 70, TFT_GREEN);
@@ -99,9 +96,6 @@ void setup() {
   //ENV2
   bme.begin(0x76);
   sht30.begin(0x44);
-  tmp_graph.init();
-  hum_graph.init();
-  press_graph.init();
 
   //clock box
   dashboard.init();
@@ -114,7 +108,6 @@ void setup() {
   xTaskCreatePinnedToCore(refreshIMUGraph, "IMU", 8192, NULL, 1, NULL, 1);
   xTaskCreatePinnedToCore(writeData, "writeData", 8192, NULL, 2, &xHandleWriteData, 0);
 }
-
 
 
 void loop() {
@@ -216,14 +209,8 @@ void refreshENV(void* arg) {
     
     xSemaphoreTake(xMutex, portMAX_DELAY);
 
-    M5.Lcd.setTextSize(2);
-    M5.Lcd.setCursor(0, 22);
-    M5.Lcd.printf("%2.1fC", tmp);
-    M5.Lcd.setCursor(102, 22);
-    M5.Lcd.printf("%2.1f%%", hum);
-    M5.Lcd.setCursor(202, 22);
-    M5.Lcd.printf("%2.2finHg", pressure);
-    M5.Lcd.setTextSize(2);
+    dashboard.env(tmp,hum,pressure);
+    
     tmp_graph.centerPlot(tmp * 30);
     hum_graph.centerPlot(hum * 10);
     press_graph.centerPlot(pressure * 1000);
@@ -278,6 +265,7 @@ void wifiServer(void* arg) {
   //wifi server
   xSemaphoreTake(xMutex, portMAX_DELAY);
   initServer();
+  dashboard.bottomButton(String(""),WiFi.softAPIP().toString(),String(""));
   xSemaphoreGive(xMutex);
   for (;;) {
     xSemaphoreTake(xMutex, portMAX_DELAY);

@@ -6,7 +6,6 @@
 class Graph{
   public:
     Graph(uint8_t x,uint8_t y,uint8_t w,uint8_t h,uint8_t mesh=0);
-    void init();
     void plotV(int val);
     void plotH(int val);
     void centerPlot(int val);

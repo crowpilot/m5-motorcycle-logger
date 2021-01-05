@@ -35,3 +35,13 @@ void Dashboard::bottomButton(String left,String center,String right){
   M5.Lcd.setCursor(250-right.length()*8,220);
   M5.Lcd.print(right);
 }
+
+void Dashboard::env(float temp,float hum,float pressure){
+  M5.Lcd.setTextSize(2);
+    M5.Lcd.setCursor(0, 22);
+    M5.Lcd.printf("%2.1fC", temp);
+    M5.Lcd.setCursor(102, 22);
+    M5.Lcd.printf("%2.1f%%", hum);
+    M5.Lcd.setCursor(202, 22);
+    M5.Lcd.printf("%2.2finHg", pressure);
+}
