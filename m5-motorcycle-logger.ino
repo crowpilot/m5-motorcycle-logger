@@ -5,7 +5,6 @@
 
 #include<M5Stack.h>
 #include<Wire.h>
-#include "utility/MahonyAHRS.h"
 
 #include "Dashboard.h"
 #include "Graph.h"
@@ -164,7 +163,9 @@ void loop() {
   vTaskDelay(100);
 }
 
+//TASK
 void refreshIMU(void* arg) {
+  //IMU display task
   for (;;) {
     xSemaphoreTake(xMutex, portMAX_DELAY);
 
@@ -181,10 +182,11 @@ void refreshIMU(void* arg) {
   }
 }
 void refreshIMUGraph(void* arg) {
+  //bank graph and G graph
   for (;;) {
     xSemaphoreTake(xMutex, portMAX_DELAY);
 
-    //test
+    //test value display
     M5.Lcd.setCursor(120, 0);
     M5.lcd.print(ins.temp());
     M5.Lcd.setCursor(200, 0);
@@ -199,6 +201,7 @@ void refreshIMUGraph(void* arg) {
 }
 
 void refreshENV(void* arg) {
+  //show ENV sensor value
   float tmp=0.0F;
   float hum=0.0F;
   float pressure=0.0F;
@@ -222,7 +225,7 @@ void refreshENV(void* arg) {
 
 void writeData(void* arg) {
   //core 0
-  //write SD card
+  //write CSV log to SD card
   float yaw, roll, pitch, temp;
   for (;;) {
     if (GPSserial.available()) {
@@ -262,7 +265,7 @@ void writeData(void* arg) {
 void wifiServer(void* arg) {
   //core 0
   //stop all
-  //wifi server
+  //start wifi server
   xSemaphoreTake(xMutex, portMAX_DELAY);
   initServer();
   dashboard.bottomButton(String(""),WiFi.softAPIP().toString(),String(""));
