@@ -228,7 +228,7 @@ void writeData(void* arg) {
   //write CSV log to SD card
   float yaw, roll, pitch, temp;
   for (;;) {
-    if (GPSserial.available()) {
+    while (GPSserial.available()) {
       //adjust clock
       gps.encode(GPSserial.read());
       if (gps.time.minute()) {
