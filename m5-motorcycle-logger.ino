@@ -59,6 +59,7 @@ Watch watch = Watch(10, 159, 310, 50);
 logCSV logcsv;
 
 //xTask
+//void mainLoop(void *arg);
 void refreshIMU(void* arg);
 void refreshIMUGraph(void* arg);
 void refreshENV(void* arg);
@@ -78,6 +79,7 @@ void setup() {
 
   //GPS
   GPSserial.begin(9600, SERIAL_8N1, 36, 26);
+  //GPSserial.begin(9600);
   //3G
   //Serial2.begin(115200, SERIAL_8N1, 16, 17);
   //modem.init();
@@ -101,12 +103,16 @@ void setup() {
   dashboard.bottomButton(String("clock"), String("LAP"), String("Data"));
 
   //task
-  xMutex = xSemaphoreCreateMutex();
-  xTaskCreatePinnedToCore(refreshENV, "ENV", 8192, NULL, 1, NULL, 1);
-  xTaskCreatePinnedToCore(refreshIMU, "IMU", 8192, NULL, 10, NULL, 1);
-  xTaskCreatePinnedToCore(refreshIMUGraph, "IMU", 8192, NULL, 1, NULL, 1);
-  xTaskCreatePinnedToCore(writeData, "writeData", 8192, NULL, 2, &xHandleWriteData, 0);
+  //if (M5.Power.isCharging()) {
+    xMutex = xSemaphoreCreateMutex();
+    //xTaskCreatePinnedToCore(mainLoop, "mainLoop", 8192, NULL, 10, NULL, 1);
+    xTaskCreatePinnedToCore(refreshENV, "ENV", 8192, NULL, 1, NULL, 1);
+    xTaskCreatePinnedToCore(refreshIMU, "IMU", 8192, NULL, 10, NULL, 1);
+    xTaskCreatePinnedToCore(refreshIMUGraph, "IMU", 8192, NULL, 1, NULL, 1);
+    xTaskCreatePinnedToCore(writeData, "writeData", 8192, NULL, 2, &xHandleWriteData, 0);
+  //}
 }
+
 
 
 void loop() {
@@ -202,18 +208,18 @@ void refreshIMUGraph(void* arg) {
 
 void refreshENV(void* arg) {
   //show ENV sensor value
-  float tmp=0.0F;
-  float hum=0.0F;
-  float pressure=0.0F;
+  static float tmp = 0.0F;
+  static float hum = 0.0F;
+  static float pressure = 0.0F;
   for (;;) {
     tmp = sht30.readTemperature();
     hum = sht30.readHumidity();
     pressure = bme.readPressure() * 0.0002953;
-    
+
     xSemaphoreTake(xMutex, portMAX_DELAY);
 
-    dashboard.env(tmp,hum,pressure);
-    
+    dashboard.env(tmp, hum, pressure);
+
     tmp_graph.centerPlot(tmp * 30);
     hum_graph.centerPlot(hum * 10);
     press_graph.centerPlot(pressure * 1000);
@@ -232,8 +238,10 @@ void writeData(void* arg) {
       //adjust clock
       gps.encode(GPSserial.read());
       if (gps.time.minute()) {
+        xSemaphoreTake(xMutex, portMAX_DELAY);
         watch.clockAdjust(gps.time.hour(), gps.time.minute(), gps.time.second());
         logcsv.setTime(gps.date.year(), gps.date.month(), gps.date.day(), watch.getHours(), watch.getMinutes(), watch.getSeconds());
+        xSemaphoreGive(xMutex);
       }
     }
     if (gps.satellites.value()) {
@@ -245,6 +253,7 @@ void writeData(void* arg) {
     M5.Lcd.setCursor(0, 0);
     M5.Lcd.setTextSize(2);
     M5.Lcd.print(gps.satellites.value());
+    //M5.Lcd.print(M5.Power.getBatteryLevel());
     logcsv.setAHRS(ins.pitch(), ins.roll(), ins.yaw());
     logcsv.setG(ins.accelG(), 0);
 
@@ -268,7 +277,7 @@ void wifiServer(void* arg) {
   //start wifi server
   xSemaphoreTake(xMutex, portMAX_DELAY);
   initServer();
-  dashboard.bottomButton(String(""),WiFi.softAPIP().toString(),String(""));
+  dashboard.bottomButton(String(""), WiFi.softAPIP().toString(), String(""));
   xSemaphoreGive(xMutex);
   for (;;) {
     xSemaphoreTake(xMutex, portMAX_DELAY);
