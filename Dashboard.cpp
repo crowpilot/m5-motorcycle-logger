@@ -17,10 +17,13 @@ void Dashboard::init(){
 
 void Dashboard::createMeter(uint8_t x,uint8_t y,uint8_t r){
   //top 0
+  M5.Lcd.drawCircleHelper(150, 148, 70, 0x3, TFT_GREEN);
 }
 
 void Dashboard::updateMeter(float val){
   //150 + 60 * sin(ins.roll() * 6.28 / 360), 148 - 60 * cos(ins.roll() * 6.28 / 360
+  M5.Lcd.drawLine(150, 148, 150 + 60 * sin(_val * 6.28 / 360), 148 - 60 * cos(_val * 6.28 / 360), TFT_BLACK);
+  M5.Lcd.drawLine(150, 148, 150 + 60 * sin(val * 6.28 / 360), 148 - 60 * cos(val * 6.28 / 360), TFT_GREEN);
   _val=val;
 }
 

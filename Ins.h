@@ -22,9 +22,18 @@ class Ins {
     float pitch();
     float roll();
     float yaw();
+
+    float velo();
+
+    float posX();
+    float posY();
+    float posZ();
+    
     float accelG();
     float sideG();
     float temp();
+
+    float heading();
 
     static int8_t i2c_read(uint8_t dev_id, uint8_t reg_addr, uint8_t *read_data, uint16_t len);
     static int8_t i2c_write(uint8_t dev_id, uint8_t reg_addr, uint8_t *read_data, uint16_t len);
@@ -54,7 +63,16 @@ class Ins {
     float _gyroYoff = 0.0F;
     float _gyroZoff = 0.0F;
 
+    float _veloX=0.0F;
+    float _veloY=0.0F;
+    float _veloZ=0.0F;
+
+    float _posX=0.0F;
+    float _posY=0.0F;
+    float _posZ=0.0F;
+
     float _temp = 0.0F;
+    float _heading=0.0F;
 
     unsigned long _timing;
 

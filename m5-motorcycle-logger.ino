@@ -90,6 +90,7 @@ void setup() {
 
   //IMU
   ins.init();
+  dashboard.createMeter(150,148,70);
 
   //G graph
   M5.Lcd.drawRect(230, 77, 10, 70, TFT_GREEN);
@@ -177,24 +178,24 @@ void refreshIMU(void* arg) {
 
     //roll indicator G indicator
     //bank angle
-    M5.Lcd.drawLine(150, 148, 150 + 60 * sin(ins.roll() * 6.28 / 360), 148 - 60 * cos(ins.roll() * 6.28 / 360), TFT_BLACK);
+    
     M5.Lcd.drawFastHLine(231, 123 + ins.accelG() * 30, 8, TFT_BLACK);
     ins.reload();
-    M5.Lcd.drawCircleHelper(150, 148, 70, 0x3, TFT_GREEN);
-    M5.Lcd.drawLine(150, 148, 150 + 60 * sin(ins.roll() * 6.28 / 360), 148 - 60 * cos(ins.roll() * 6.28 / 360), TFT_GREEN);
+    
+    
     M5.Lcd.drawFastHLine(231, 123 + ins.accelG() * 30, 8, TFT_GREEN);
     xSemaphoreGive(xMutex);
-    vTaskDelay(20);
+    vTaskDelay(5);
   }
 }
 void refreshIMUGraph(void* arg) {
   //bank graph and G graph
   for (;;) {
     xSemaphoreTake(xMutex, portMAX_DELAY);
-
+    dashboard.updateMeter(ins.roll());
     //test value display
     M5.Lcd.setCursor(120, 0);
-    M5.lcd.print(ins.temp());
+    M5.lcd.print(ins.velo());
     M5.Lcd.setCursor(200, 0);
     M5.Lcd.print(ins.yaw());
 

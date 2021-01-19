@@ -20,7 +20,7 @@ void Ins::init() {
     _gyroYoff += _gyroY / 100;
     _gyroZoff += _gyroZ / 100;
     //bmm150_read_mag_data(&_dev);
-    delay(10);
+    delay(20);
   }
   if (bmm150_initialization() != BMM150_OK)
   {
@@ -34,9 +34,12 @@ void Ins::reload() {
   M5.IMU.getGyroData(&_gyroX, &_gyroY, &_gyroZ);
   M5.IMU.getAccelData(&_accX, &_accY, &_accZ);
   bmm150_read_mag_data(&_dev);
+  
+  _heading=atan2(_dev.data.x-_mag_offset.x, _dev.data.y-_mag_offset.y)/DEG_TO_RAD;
+  
   Ins::MahonyAHRSupdate((_gyroX - _gyroXoff) * DEG_TO_RAD , (_gyroY - _gyroYoff) * DEG_TO_RAD , (_gyroZ - _gyroZoff) * DEG_TO_RAD ,
                         _accX, _accY, _accZ,
-                        _dev.data.x - _mag_offset.x, _dev.data.y - _mag_offset.y, _dev.data.z - _mag_offset.z, &_roll, &_pitch, &_yaw);
+                        _dev.data.x - _mag_offset.x, _dev.data.y - _mag_offset.y, _dev.data.z - _mag_offset.z, &_pitch, &_roll, &_yaw);
   //MahonyAHRSupdateIMU((_gyroX-_gyroXoff) * DEG_TO_RAD*0.6, (_gyroY-_gyroYoff) * DEG_TO_RAD*0.6, (_gyroZ-_gyroZoff) * DEG_TO_RAD*0.6, _accX, _accY, _accZ, &_roll, &_pitch, &_yaw);
   //MadgwickFilter.update(_gyroX,_gyroY,_gyroZ,_accX,_accY,_accZ,_dev.data.x,_dev.data.y,_dev.data.z);
 }
@@ -58,6 +61,15 @@ float Ins::yaw() {
   //return MadgwickFilter.getYaw();
 }
 
+float Ins::velo(){
+  //return sqrt(_veloX*_veloX+_veloY+_veloY);
+  return _veloX;
+}
+
+float Ins::posX(){
+  return _posX;
+}
+
 float Ins::accelG() {
   return -_accY * cos(_pitch * DEG_TO_RAD) + _accZ * sin(_pitch * DEG_TO_RAD);
 }
@@ -68,6 +80,10 @@ float Ins::sideG(){
 
 float Ins::temp() {
   return _temp;
+}
+
+float Ins::heading(){
+  return _heading;
 }
 
 int8_t Ins::i2c_read(uint8_t dev_id, uint8_t reg_addr, uint8_t *read_data, uint16_t len)
@@ -118,7 +134,8 @@ int8_t Ins::bmm150_initialization()
   rslt = bmm150_init(&_dev);
   _dev.settings.pwr_mode = BMM150_NORMAL_MODE;
   rslt |= bmm150_set_op_mode(&_dev);
-  _dev.settings.preset_mode = BMM150_PRESETMODE_ENHANCED;
+  //enhanced 0.8mA high accuracy 4.8mA
+  _dev.settings.preset_mode = BMM150_PRESETMODE_HIGHACCURACY;
   rslt |= bmm150_set_presetmode(&_dev);
   return rslt;
 }
@@ -161,6 +178,29 @@ void Ins::MahonyAHRSupdate(float gx, float gy, float gz, float ax, float ay, flo
 
   // Compute feedback only if accelerometer measurement valid (avoids NaN in accelerometer normalisation)
   if (!((ax == 0.0f) && (ay == 0.0f) && (az == 0.0f))) {
+    interval = float(millis() - _timing) / 1000;
+    _timing = millis();
+
+    //_veloX+=ax*interval;
+    //_veloY+=ay*interval;
+    //_veloZ+=az*interval;
+    
+    // Auxiliary variables to avoid repeated arithmetic
+    q0q0 = q0 * q0;
+    q0q1 = q0 * q1;
+    q0q2 = q0 * q2;
+    q0q3 = q0 * q3;
+    q1q1 = q1 * q1;
+    q1q2 = q1 * q2;
+    q1q3 = q1 * q3;
+    q2q2 = q2 * q2;
+    q2q3 = q2 * q3;
+    q3q3 = q3 * q3;
+
+    _veloX+=(ax*(q0q0+q1q1-q2q2-q3q3)+ay*2*(q1q2-q0q3)+az*2*(q1q3+q0q2))*interval*9.807;
+    _veloY+=(ax*2*(q1q2+q0q3)+ay*(q0q0-q1q1+q2q2-q3q3)+az*2*(q2q3-q0q1))*interval*9.807;
+    _veloZ+=(ax*2*(q1q3-q0q2)+ay*2*(q2q3+q0q1)+az*(q0q0-q1q1-q2q2+q3q3)-1.02)*interval*9.807;
+    //_veloX+=2*(q1q3-q0q2)*interval;
 
     // Normalise accelerometer measurement
     recipNorm = sqrt(ax * ax + ay * ay + az * az);
@@ -174,18 +214,6 @@ void Ins::MahonyAHRSupdate(float gx, float gy, float gz, float ax, float ay, flo
     my /= recipNorm;
     mz /= recipNorm;
 
-    // Auxiliary variables to avoid repeated arithmetic
-    q0q0 = q0 * q0;
-    q0q1 = q0 * q1;
-    q0q2 = q0 * q2;
-    q0q3 = q0 * q3;
-    q1q1 = q1 * q1;
-    q1q2 = q1 * q2;
-    q1q3 = q1 * q3;
-    q2q2 = q2 * q2;
-    q2q3 = q2 * q3;
-    q3q3 = q3 * q3;
-
     // Reference direction of Earth's magnetic field
     hx = 2.0f * (mx * (0.5f - q2q2 - q3q3) + my * (q1q2 - q0q3) + mz * (q1q3 + q0q2));
     hy = 2.0f * (mx * (q1q2 + q0q3) + my * (0.5f - q1q1 - q3q3) + mz * (q2q3 - q0q1));
@@ -193,6 +221,7 @@ void Ins::MahonyAHRSupdate(float gx, float gy, float gz, float ax, float ay, flo
     bz = 2.0f * (mx * (q1q3 - q0q2) + my * (q2q3 + q0q1) + mz * (0.5f - q1q1 - q2q2));
 
     // Estimated direction of gravity and magnetic field
+    //v = vector
     halfvx = q1q3 - q0q2;
     halfvy = q0q1 + q2q3;
     halfvz = q0q0 - 0.5f + q3q3;
@@ -234,8 +263,7 @@ void Ins::MahonyAHRSupdate(float gx, float gy, float gz, float ax, float ay, flo
   //gx *= (0.5f * (1.0f / sampleFreq));   // pre-multiply common factors
   //gy *= (0.5f * (1.0f / sampleFreq));
   //gz *= (0.5f * (1.0f / sampleFreq));
-  interval = float(millis() - _timing) / 1000;
-  _timing = millis();
+  
   gx *= (0.5f * interval);   // pre-multiply common factors
   gy *= (0.5f * interval);
   gz *= (0.5f * interval);
@@ -254,8 +282,8 @@ void Ins::MahonyAHRSupdate(float gx, float gy, float gz, float ax, float ay, flo
   q2 /= recipNorm;
   q3 /= recipNorm;
 
-  *pitch = asin(-2 * q1 * q3 + 2 * q0 * q2); // pitch
-  *roll  = atan2(2 * q2 * q3 + 2 * q0 * q1, -2 * q1 * q1 - 2 * q2 * q2 + 1); // roll
+  *roll = asin(-2 * q1 * q3 + 2 * q0 * q2); // pitch
+  *pitch  = atan2(2 * q2 * q3 + 2 * q0 * q1, -2 * q1 * q1 - 2 * q2 * q2 + 1); // roll
   *yaw   = atan2(2 * (q1 * q2 + q0 * q3), q0 * q0 + q1 * q1 - q2 * q2 - q3 * q3); //yaw
 
   *pitch *= RAD_TO_DEG;
