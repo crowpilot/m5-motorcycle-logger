@@ -194,8 +194,8 @@ void refreshIMUGraph(void* arg) {
     xSemaphoreTake(xMutex, portMAX_DELAY);
     dashboard.updateMeter(ins.roll());
     //test value display
-    M5.Lcd.setCursor(120, 0);
-    M5.lcd.print(ins.velo());
+    //M5.Lcd.setCursor(120, 0);
+    //M5.lcd.print(ins.velo());
     M5.Lcd.setCursor(200, 0);
     M5.Lcd.print(ins.yaw());
 
@@ -266,7 +266,11 @@ void writeData(void* arg) {
     xSemaphoreGive(xMutex);
 
     //write SD
-    logcsv.writeCSV();
+    if(gps.date.month()){
+      logcsv.writeCSV();
+    }else if(logcsv.getInterval()==100){
+      logcsv.writeCSV();
+    }
 
     vTaskDelay(logcsv.getInterval());
   }
