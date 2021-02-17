@@ -266,7 +266,11 @@ void writeData(void* arg) {
     xSemaphoreGive(xMutex);
 
     //write SD
-    logcsv.writeCSV();
+    if(gps.date.month()){
+      logcsv.writeCSV();
+    }else if(logcsv.getInterval()==100){
+      logcsv.writeCSV();
+    }
 
     vTaskDelay(logcsv.getInterval());
   }
