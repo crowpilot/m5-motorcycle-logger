@@ -71,7 +71,7 @@ float Ins::posX(){
 }
 
 float Ins::accelG() {
-  return -_accY * cos(_pitch * DEG_TO_RAD) + _accZ * sin(_pitch * DEG_TO_RAD);
+  return -_accY;
 }
 
 float Ins::sideG(){
