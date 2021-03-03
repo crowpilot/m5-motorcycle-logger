@@ -129,6 +129,15 @@
     .attr("cy", function(d) { return yScaleGPS(d.latitude); })
     .attr("fill", function(d){return color(Math.round(Math.abs(d.roll)));})
     .attr("r", 4);
+    
+  svg.append("path")
+    .datum(data)
+    .attr("fill", "none")
+    .attr("stroke", "greenyellow")
+    .attr("stroke-width", 1.5)
+    .attr("d", d3.line()
+      .x(function(d) { return xScale(d.timestamp); })
+      .y(function(d) { return yScaleG(d.accelG); }));
   
   svg.append("path")
     .datum(data)
@@ -157,14 +166,7 @@
       .x(function(d) { return xScale(d.timestamp); })
       .y(function(d) { return yScale(d.pitch); }));
       
-   svg.append("path")
-    .datum(data)
-    .attr("fill", "none")
-    .attr("stroke", "greenyellow")
-    .attr("stroke-width", 1.5)
-    .attr("d", d3.line()
-      .x(function(d) { return xScale(d.timestamp); })
-      .y(function(d) { return yScaleG(d.accelG); }));
+   
   /*svg.append("circle")
     .selectAll("circle")
     .data(data)
